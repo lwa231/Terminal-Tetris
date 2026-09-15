@@ -2,11 +2,21 @@
 #include <string>
 #include <unordered_map>
 #include <functional>
-#include <termios.h>
-#include <unistd.h>
+#include <conio.h> //#include termios.h
+#include <windows.h> //#include unistd.h
 #include <chrono>
 #include <thread>
 #include <random>
+
+
+void enableVirtualTerminal() {
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD mode = 0;
+    GetConsoleMode(hOut, &mode);
+    mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    SetConsoleMode(hOut, mode);
+}
+
 
 //KEYBUNDS
 class InputHandler {
@@ -33,7 +43,7 @@ private:
 
 
 //POSITION VALUES
-struct Position{
+struct Position{ 
     int pastrow;
     int pastcol;
     int row;
@@ -70,8 +80,8 @@ const std::array<std::array<std::array<int, 16>, 4>, 7> Block::shapes =
     {{
         {0,0,0,0, 1,1,1,1, 0,0,0,0, 0,0,0,0},
         {0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0},
-        {0,0,0,0, 1,1,1,1, 0,0,0,0, 0,0,0,0},
-        {0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0}
+        {0,0,0,0, 0,0,0,0, 1,1,1,1, 0,0,0,0},
+        {0,1,0,0, 0,1,0,0, 0,1,0,0, 0,1,0,0}
     }},
     // 2: O
     {{
@@ -83,37 +93,37 @@ const std::array<std::array<std::array<int, 16>, 4>, 7> Block::shapes =
     // 3: T
     {{
         {0,0,0,0, 3,3,3,0, 0,3,0,0, 0,0,0,0},
-        {0,3,0,0, 3,3,0,0, 0,3,0,0, 0,0,0,0},
-        {0,3,0,0, 3,3,3,0, 0,0,0,0, 0,0,0,0},
-        {0,3,0,0, 0,3,3,0, 0,3,0,0, 0,0,0,0}
+        {0,0,3,0, 0,3,3,0, 0,0,3,0, 0,0,0,0},
+        {0,0,0,0, 0,0,3,0, 0,3,3,3, 0,0,0,0},
+        {0,0,0,0, 0,3,0,0, 0,3,3,0, 0,3,0,0}
     }},
     // 4: S
     {{
         {0,0,0,0, 0,4,4,0, 4,4,0,0, 0,0,0,0},
-        {4,0,0,0, 4,4,0,0, 0,4,0,0, 0,0,0,0},
-        {0,0,0,0, 0,4,4,0, 4,4,0,0, 0,0,0,0},
-        {4,0,0,0, 4,4,0,0, 0,4,0,0, 0,0,0,0}
+        {0,4,0,0, 0,4,4,0, 0,0,4,0, 0,0,0,0},
+        {0,0,0,0, 0,0,4,4, 0,4,4,0, 0,0,0,0},
+        {0,0,0,0, 0,4,0,0, 0,4,4,0, 0,0,4,0}
     }},
     // 5: Z
     {{
         {0,0,0,0, 5,5,0,0, 0,5,5,0, 0,0,0,0},
-        {0,5,0,0, 5,5,0,0, 5,0,0,0, 0,0,0,0},
-        {0,0,0,0, 5,5,0,0, 0,5,5,0, 0,0,0,0},
-        {0,5,0,0, 5,5,0,0, 5,0,0,0, 0,0,0,0}
+        {0,0,5,0, 0,5,5,0, 0,5,0,0, 0,0,0,0},
+        {0,0,0,0, 0,5,5,0, 0,0,5,5, 0,0,0,0},
+        {0,0,0,0, 0,0,5,0, 0,5,5,0, 0,5,0,0}
     }},
     // 6: J
     {{
         {6,0,0,0, 6,6,6,0, 0,0,0,0, 0,0,0,0},
-        {0,6,6,0, 0,6,0,0, 0,6,0,0, 0,0,0,0},
-        {0,0,0,0, 6,6,6,0, 0,0,6,0, 0,0,0,0},
-        {0,6,0,0, 0,6,0,0, 6,6,0,0, 0,0,0,0}
+        {0,0,6,6, 0,0,6,0, 0,0,6,0, 0,0,0,0},
+        {0,0,0,0, 0,0,0,0, 0,6,6,6, 0,0,0,6},
+        {0,0,0,0, 0,6,0,0, 0,6,0,0, 6,6,0,0}
     }},
     // 7: L
     {{
         {0,0,7,0, 7,7,7,0, 0,0,0,0, 0,0,0,0},
-        {0,7,0,0, 0,7,0,0, 0,7,7,0, 0,0,0,0},
-        {0,0,0,0, 7,7,7,0, 7,0,0,0, 0,0,0,0},
-        {7,7,0,0, 0,7,0,0, 0,7,0,0, 0,0,0,0}
+        {0,0,7,0, 0,0,7,0, 0,0,7,7, 0,0,0,0},
+        {0,0,0,0, 0,0,0,0, 0,7,7,7, 0,7,0,0},
+        {0,0,0,0, 7,7,0,0, 0,7,0,0, 0,7,0,0}
     }}
 }};
 
@@ -123,7 +133,7 @@ Block::Block(){
     blockPos.col = 3;
     blockPos.row = 0;
     blockPos.pastrow = 0;
-    blockPos.pastcol = 0;
+    blockPos.pastcol = 3;
 }
 
 int Block::Brandomizer(int rnColor){
@@ -137,27 +147,27 @@ int Block::Rotate(){
 }
 
 void Block::MoveDown(){
-    if ((blockPos.row > -1) && ((blockPos.col + 1) < 20))
+    if ((blockPos.row >= 0) && ((blockPos.row + 1) < 20))
     {
-    blockPos.pastrow = blockPos.row;
-    blockPos.row += 2;
+        blockPos.pastrow = blockPos.row;
+        blockPos.row += 2;
     }
 }
 
 void Block::MoveLeft(){
-    if (((blockPos.col - 1) > 0) && (blockPos.col < 11))
+    if (((blockPos.col - 1) >= 0) && (blockPos.col < 10))
     {
         blockPos.pastcol = blockPos.col;
-        blockPos.col -= 1;
+        blockPos.col -= 2;
     }
     
 }
 
 void Block::MoveRight(){
-    if ((blockPos.col > -1) && ((blockPos.col + 1) < 10))
+    if ((blockPos.col >= 0) && ((blockPos.col + 1) < 10))
     {
         blockPos.pastcol = blockPos.col;
-        blockPos.col += 1;
+        blockPos.col += 2;
     }
 }
 
@@ -415,35 +425,29 @@ Game::~Game()
 }
 //TERMINAL CONFIG
 // ---- Raw mode: set up ONCE, restore ONCE ----
-
-struct termios orig_termios;
+HANDLE hStdin;
+DWORD origMode;
 
 void disableRawMode() {
-    tcsetattr(STDIN_FILENO, TCSANOW, &orig_termios);
+    SetConsoleMode(hStdin, origMode);   // restore whatever was saved
 }
 
 void enableRawMode() {
-    tcgetattr(STDIN_FILENO, &orig_termios);
-    atexit(disableRawMode);
+    hStdin = GetStdHandle(STD_INPUT_HANDLE);
+    GetConsoleMode(hStdin, &origMode);   // save current settings
+    atexit(disableRawMode);              // same guarantee-restore-on-exit pattern
 
-    struct termios raw = orig_termios;
-
-    raw.c_iflag &= ~(IXON | ICRNL | BRKINT | INPCK | ISTRIP);  // add this
-    //raw.c_oflag &= ~(OPOST);  <<removed to maintain \n usage                                  // add this
-    raw.c_lflag &= ~(ICANON | ECHO | ISIG);                     // replace your existing line with this
-
-    raw.c_cc[VMIN] = 0;
-    raw.c_cc[VTIME] = 0;
-
-    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
-    tcflush(STDIN_FILENO, TCIFLUSH);
+    DWORD rawMode = origMode;
+    rawMode &= ~(ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT); // disable line buffering + echo
+    SetConsoleMode(hStdin, rawMode);      // apply
 }
 
-//AI function make sure you learn how it works
+//Check to see how this is working on a deeper level
 char getch_instant() {
-    char buf = 0;
-    read(STDIN_FILENO, &buf, 1); // returns immediately; buf stays 0 if no key waiting
-    return buf;
+    if (_kbhit()) {        // non-blocking check: is a key waiting?
+        return _getch();   // read it instantly, no Enter needed, no echo
+    }
+    return 0;               // nothing pressed — matches your existing "0 means no key" convention
 }
 
 
@@ -452,6 +456,7 @@ char getch_instant() {
 //bool gamestate = false;
 
 int main(){
+    enableVirtualTerminal();
     enableRawMode();
 
     std::ios::sync_with_stdio(false); // faster cout, no C stdio interleaving issues
@@ -493,6 +498,7 @@ int main(){
         game.GetCheckdGrid();
         game.TrigGridUpdate();
         game.DrawGrid(); //already updated
+        //std::cout << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n";
         
         
 
