@@ -34,6 +34,8 @@ private:
 
 //POSITION VALUES
 struct Position{
+    int pastrow;
+    int pastcol;
     int row;
     int col;    
 };
@@ -118,8 +120,10 @@ const std::array<std::array<std::array<int, 16>, 4>, 7> Block::shapes =
 Block::Block(){
     active = true;
     blockAngle = 0;
-    blockPos.col = 0;
-    blockPos.row = 3;
+    blockPos.col = 3;
+    blockPos.row = 0;
+    blockPos.pastrow = 0;
+    blockPos.pastcol = 0;
 }
 
 int Block::Brandomizer(int rnColor){
@@ -133,15 +137,28 @@ int Block::Rotate(){
 }
 
 void Block::MoveDown(){
-    blockPos.row += 1;
+    if ((blockPos.row > -1) && ((blockPos.col + 1) < 20))
+    {
+    blockPos.pastrow = blockPos.row;
+    blockPos.row += 2;
+    }
 }
 
 void Block::MoveLeft(){
-    blockPos.col -= 1;
+    if (((blockPos.col - 1) > 0) && (blockPos.col < 11))
+    {
+        blockPos.pastcol = blockPos.col;
+        blockPos.col -= 1;
+    }
+    
 }
 
 void Block::MoveRight(){
-    blockPos.col += 1;
+    if ((blockPos.col > -1) && ((blockPos.col + 1) < 10))
+    {
+        blockPos.pastcol = blockPos.col;
+        blockPos.col += 1;
+    }
 }
 
 std::array<int, 16> Block::GtBData()
@@ -167,7 +184,7 @@ class Grid {
         void Init();
         void PrintGrid();
         void UpdateGrid(const std::array<int, 16>, const bool CG_result, const int, const int);
-        void CleanUp(const int, const int);
+        void CleanUp(const int, const int, const int, const int);
         bool CheckGrid(const std::array<int, 16>, const int, const int);
         bool GetCGresult(){return CG_result;}
     private:
@@ -248,7 +265,7 @@ void Grid::UpdateGrid(const std::array<int, 16> blockShape,const bool CG_result,
                 int relCol = j - col; //relative row and col values
                 
                 if ((blockShape[(relRow * 4) + relCol]) != 0)
-                {
+                {   
                     grid[i][j] = blockShape[(relRow * 4) + relCol];
                 }
                 
@@ -259,13 +276,15 @@ void Grid::UpdateGrid(const std::array<int, 16> blockShape,const bool CG_result,
     }
 }
 
-void Grid::CleanUp(const int row, const int col)
+void Grid::CleanUp(const int pastrow, const int pastcol, const int row, const int col)
 {
-    for (int i = (row - 4); i < row; i++)
-    {
-        for (int j = col; j < col; j++)
+    if((pastrow != row) || (pastcol != col)){
+        for (int i = (pastrow - 4); i < pastrow; i++)
         {
-            grid[i][j] = 0;
+            for (int j = pastcol; j < (pastcol + 4); j++)
+            {
+                grid[i][j] = 0;
+            }
         }
     }
 }
@@ -290,7 +309,8 @@ class Game
         }
         //Block Stuff
         Block* BlockSpawn();
-        
+        void PrintBlockPos();
+
         void Gravity();
         void KBMoveL();
         void KBMoveR();
@@ -300,6 +320,7 @@ class Game
         void DrawGrid();
         void GetCheckdGrid();
         void TrigGridUpdate();
+        void TrigCleanUp();
         
 
 
@@ -334,6 +355,17 @@ Block* Game::BlockSpawn()
     return currentBlock;
 }
 
+void Game::PrintBlockPos()
+{
+    int row = currentBlock -> GetBlockPos().row;
+    int col = currentBlock -> GetBlockPos().col;
+    int pastrow = currentBlock -> GetBlockPos().pastrow;
+    int pastcol = currentBlock -> GetBlockPos().pastcol;
+
+    std::cout << "Current Block Pos { " << "Row: " << row << " Col: " << col << " PastRow: " << pastrow << " PastCol: " << pastcol << " }" << "\n";
+
+}
+
 void Game::Gravity()
 {
     currentBlock -> MoveDown();
@@ -342,16 +374,19 @@ void Game::Gravity()
 void Game::KBMoveL()
 {
     currentBlock->MoveLeft();
+    //TrigCleanUp();
 }
 
 void Game::KBMoveR()
 {
     currentBlock -> MoveRight();
+    //TrigCleanUp();
 }
 
 void Game::KBRotate()
 {
     currentBlock->Rotate();
+    //TrigCleanUp();
 }
 
 void Game::DrawGrid()
@@ -367,6 +402,11 @@ void Game::GetCheckdGrid()
 void Game::TrigGridUpdate()
 {
     board.UpdateGrid((currentBlock->GtBData()),gridstate,(currentBlock->GetBlockPos().row),(currentBlock->GetBlockPos().col));
+}
+
+void Game::TrigCleanUp()
+{
+    board.CleanUp((currentBlock->GetBlockPos().pastrow),(currentBlock->GetBlockPos().pastcol), (currentBlock->GetBlockPos().row), (currentBlock->GetBlockPos().col));
 }
 
 Game::~Game()
@@ -422,6 +462,7 @@ int main(){
 
     Game game;
     game.BlockSpawn();
+    
     InputHandler userIn;
     char PressedKey = 0;
     int frameCount = 0;
@@ -446,11 +487,13 @@ int main(){
 
         std::cout << "\033[2J\033[1;1H"; //clear screen, move curser to row 1 col 1.
         std::cout << "Frame: " << frameCount++ << "\n"; //frame counter
+        game.PrintBlockPos();
         // simulate a real game loop event
         userIn.handleInput(PressedKey);
         game.GetCheckdGrid();
         game.TrigGridUpdate();
         game.DrawGrid(); //already updated
+        
         
 
         std::this_thread::sleep_for(std::chrono::milliseconds(64)); //fps cap ~15 
