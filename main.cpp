@@ -44,10 +44,11 @@ private:
 
 //POSITION VALUES
 struct Position{ 
+    int row;
+    int col; 
     int pastrow;
     int pastcol;
-    int row;
-    int col;    
+       
 };
 
 //BLOCK LOGIC
@@ -57,11 +58,13 @@ class Block{
         Block();
         int Brandomizer(int rnColor);
         Position GetBlockPos() const { return blockPos; }
+        int GetBlockAngle() const {return blockAngle;}
+        int GetPastAngle() const {return pastAngle;}
         std::array<int, 16> GtBData(); //returns the current vector data for any given block type and orientation, crucial for blitting block onto grid
         int Rotate();
-        void MoveDown();
-        void MoveLeft();
-        void MoveRight();
+        void MoveDown(bool);
+        void MoveLeft(bool);
+        void MoveRight(bool);
         const bool GetBlockState();
         void SetBlockState(bool);
         
@@ -70,6 +73,7 @@ class Block{
         Position blockPos;
         int blockType;
         int blockAngle;
+        int pastAngle;
         static const std::array<std::array<std::array<int, 16>, 4>, 7> shapes;
 
 };
@@ -130,10 +134,11 @@ const std::array<std::array<std::array<int, 16>, 4>, 7> Block::shapes =
 Block::Block(){
     active = true;
     blockAngle = 0;
-    blockPos.col = 3;
+    pastAngle = blockAngle;
     blockPos.row = 0;
-    blockPos.pastrow = 0;
-    blockPos.pastcol = 3;
+    blockPos.col = 3;
+    blockPos.pastrow = blockPos.row;
+    blockPos.pastcol = blockPos.col;
 }
 
 int Block::Brandomizer(int rnColor){
@@ -142,20 +147,21 @@ int Block::Brandomizer(int rnColor){
 }
 
 int Block::Rotate(){
+    pastAngle = blockAngle;
     blockAngle = (blockAngle + 1) % 4;
     return blockAngle;
 }
 
-void Block::MoveDown(){
-    if ((blockPos.row >= 0) && ((blockPos.row + 1) < 20))
+void Block::MoveDown(bool inbounds){ //update this
+    if ((inbounds) && (blockPos.row >= 0) && ((blockPos.row + 1) < 20))
     {
         blockPos.pastrow = blockPos.row;
         blockPos.row += 2;
     }
 }
 
-void Block::MoveLeft(){
-    if (((blockPos.col - 1) >= 0) && (blockPos.col < 10))
+void Block::MoveLeft(bool inbounds){ //update this
+    if ((inbounds) && ((blockPos.col - 1) >= 0) && (blockPos.col < 10))
     {
         blockPos.pastcol = blockPos.col;
         blockPos.col -= 2;
@@ -163,8 +169,8 @@ void Block::MoveLeft(){
     
 }
 
-void Block::MoveRight(){
-    if ((blockPos.col >= 0) && ((blockPos.col + 1) < 10))
+void Block::MoveRight(bool inbounds){ //update this
+    if ((inbounds) && (blockPos.col >= 0) && ((blockPos.col + 1) < 10))
     {
         blockPos.pastcol = blockPos.col;
         blockPos.col += 2;
@@ -187,18 +193,26 @@ void Block::SetBlockState(bool inp)
 }
 
 //GRID LOGIC
+
+struct CG_results
+{
+    bool LB_result;
+    bool SC_result;
+    bool BC_result;
+};
+
 class Grid {
     public:
         //initializes and checks ITSELF
         Grid();
         void Init();
         void PrintGrid();
-        void UpdateGrid(const std::array<int, 16>, const bool CG_result, const int, const int);
-        void CleanUp(const int, const int, const int, const int);
-        bool CheckGrid(const std::array<int, 16>, const int, const int);
-        bool GetCGresult(){return CG_result;}
+        void UpdateGrid(const std::array<int, 16>, const bool SC_result, const bool LB_result, const int, const int);
+        void CleanUp(const int, const int, const int, const int, const int, const int);
+        void CheckGrid(const std::array<int, 16>, const int, const int);
+        CG_results GetCGresults() const {return CGresults;}
     private:
-        bool CG_result;
+        CG_results CGresults;
         int numRows;
         int numCols;
         int grid[20][10];
@@ -207,7 +221,9 @@ class Grid {
 Grid::Grid(){
     numRows = 20;
     numCols = 10;
-    CG_result = true;
+    CGresults.LB_result = false; //false by default bc its active at spawn
+    CGresults.SC_result = true; //true by default bc its clear at spawn, could change depending on conditions but that is covered by first game loop iteration.
+    CGresults.BC_result = true; // true by default bc its in bounds at spawn
     Init();
 }
 
@@ -232,7 +248,7 @@ void Grid::PrintGrid()
     std::cout << prBoard;
 }
 
-bool Grid::CheckGrid(const std::array<int, 16> blockShape, const int row, const int col)
+void Grid::CheckGrid(const std::array<int, 16> blockShape, const int row, const int col)
 {
 
     for (int i = row; i < (row + 4); i++){
@@ -242,30 +258,40 @@ bool Grid::CheckGrid(const std::array<int, 16> blockShape, const int row, const 
 
             if (blockShape[(4 * relRow) + relCol] != 0){
 
-                if ((i >= numRows || j >= numCols || j < 0)) // !!!!!!!!! CHECK THIS !!!!!!!!!!
+                if ((i >= (numRows - 1) || j >= (numCols - 1)|| j < 0)) // !!!!!!!!! CHECK THIS !!!!!!!!!!
                 {    
-                    CG_result = false; 
-                    return CG_result;
+                    CGresults.BC_result = false;
+                    CGresults.SC_result = false; 
+
+                }
+                else
+                {
+                    CGresults.BC_result = true;
+                    CGresults.SC_result = true;
                 }
 
                 if ((grid[i][j] != 0)) // add a closer check
                 {
-                    CG_result = false; 
-                    return CG_result;
+                    CGresults.LB_result = true;
+                    CGresults.SC_result = false; 
+                }
+                else
+                {
+                    CGresults.LB_result = false;
+                    CGresults.SC_result = true;
                 }
 
             }
-        }
-    }
 
-    CG_result = true; 
-    return CG_result;
+        }
+
+    }
 }
 
-void Grid::UpdateGrid(const std::array<int, 16> blockShape,const bool CG_result, const int row, const int col) // draws the block onto the grid and also locks blocks into place
+void Grid::UpdateGrid(const std::array<int, 16> blockShape,const bool SC_result, const bool LB_result, const int row, const int col) // draws the block onto the grid and also locks blocks into place
 {
     
-    if (CG_result) 
+    if (SC_result) 
     {
         for (int i = (row); i < (row + 4); i++) // starts at row above the already checked current block
         {
@@ -286,10 +312,10 @@ void Grid::UpdateGrid(const std::array<int, 16> blockShape,const bool CG_result,
     }
 }
 
-void Grid::CleanUp(const int pastrow, const int pastcol, const int row, const int col)
+void Grid::CleanUp(const int pastrow, const int pastcol, const int row, const int col, const int angle, const int pastangle)
 {
     if((pastrow != row) || (pastcol != col)){
-        for (int i = (pastrow - 4); i < pastrow; i++)
+        for (int i = pastrow; i < (pastrow + 4); i++)
         {
             for (int j = pastcol; j < (pastcol + 4); j++)
             {
@@ -297,6 +323,19 @@ void Grid::CleanUp(const int pastrow, const int pastcol, const int row, const in
             }
         }
     }
+
+    if((pastangle != angle))
+    {
+        for (int i = row; i < (row + 4); i++)
+        {
+            for (int j = col; j < (col + 4); j++)
+            {
+                grid[i][j] = 0;
+            }
+        }
+    }
+
+
 }
 
 
@@ -319,7 +358,7 @@ class Game
         }
         //Block Stuff
         Block* BlockSpawn();
-        void PrintBlockPos();
+        void PrintBlockData();
 
         void Gravity();
         void KBMoveL();
@@ -340,6 +379,8 @@ class Game
     Block* currentBlock;
     int score;
     bool gridstate;
+    bool inbounds;
+    bool lockblock;
     bool gamestate;
     std::mt19937 gen;
     std::uniform_int_distribution<int> dist;
@@ -352,6 +393,9 @@ Game::Game()
     score = 0;
     gamestate = false;
     currentBlock = nullptr;
+    gridstate = board.GetCGresults().SC_result;
+    inbounds = board.GetCGresults().BC_result;
+    lockblock = board.GetCGresults().LB_result;
     
 }
 
@@ -365,38 +409,41 @@ Block* Game::BlockSpawn()
     return currentBlock;
 }
 
-void Game::PrintBlockPos()
+void Game::PrintBlockData()
 {
     int row = currentBlock -> GetBlockPos().row;
     int col = currentBlock -> GetBlockPos().col;
     int pastrow = currentBlock -> GetBlockPos().pastrow;
     int pastcol = currentBlock -> GetBlockPos().pastcol;
+    int Angle = currentBlock -> GetBlockAngle();
+    int PAngle = currentBlock -> GetPastAngle();
 
-    std::cout << "Current Block Pos { " << "Row: " << row << " Col: " << col << " PastRow: " << pastrow << " PastCol: " << pastcol << " }" << "\n";
+    std::cout << "Current Block Pos { " << "Row: " << row << " Col: " << col << " PastRow: " << pastrow << " PastCol: " << pastcol << " Angle: " << Angle << " PastAngle: " << PAngle << " }" << "\n";
 
 }
 
 void Game::Gravity()
 {
-    currentBlock -> MoveDown();
+    currentBlock -> MoveDown((board.GetCGresults().BC_result));
+    TrigCleanUp();
 }
 
 void Game::KBMoveL()
 {
-    currentBlock->MoveLeft();
-    //TrigCleanUp();
+    currentBlock->MoveLeft((board.GetCGresults().BC_result));
+    TrigCleanUp();
 }
 
 void Game::KBMoveR()
 {
-    currentBlock -> MoveRight();
-    //TrigCleanUp();
+    currentBlock -> MoveRight((board.GetCGresults().BC_result));
+    TrigCleanUp();
 }
 
 void Game::KBRotate()
 {
     currentBlock->Rotate();
-    //TrigCleanUp();
+    TrigCleanUp();
 }
 
 void Game::DrawGrid()
@@ -404,19 +451,23 @@ void Game::DrawGrid()
     board.PrintGrid();
 }
 
+
 void Game::GetCheckdGrid()
 {
-    gridstate = board.CheckGrid((currentBlock->GtBData()),(currentBlock->GetBlockPos().row),(currentBlock->GetBlockPos().col));
+    board.CheckGrid((currentBlock->GtBData()),(currentBlock->GetBlockPos().row),(currentBlock->GetBlockPos().col));
+    gridstate = board.GetCGresults().SC_result;
+    inbounds = board.GetCGresults().BC_result;
+    lockblock = board.GetCGresults().LB_result;
 }
 
 void Game::TrigGridUpdate()
 {
-    board.UpdateGrid((currentBlock->GtBData()),gridstate,(currentBlock->GetBlockPos().row),(currentBlock->GetBlockPos().col));
+    board.UpdateGrid((currentBlock->GtBData()), gridstate, lockblock, (currentBlock->GetBlockPos().row), (currentBlock->GetBlockPos().col));
 }
 
 void Game::TrigCleanUp()
 {
-    board.CleanUp((currentBlock->GetBlockPos().pastrow),(currentBlock->GetBlockPos().pastcol), (currentBlock->GetBlockPos().row), (currentBlock->GetBlockPos().col));
+    board.CleanUp((currentBlock->GetBlockPos().pastrow),(currentBlock->GetBlockPos().pastcol), (currentBlock->GetBlockPos().row), (currentBlock->GetBlockPos().col), (currentBlock -> GetBlockAngle()), (currentBlock -> GetPastAngle()));
 }
 
 Game::~Game()
@@ -492,7 +543,7 @@ int main(){
 
         std::cout << "\033[2J\033[1;1H"; //clear screen, move curser to row 1 col 1.
         std::cout << "Frame: " << frameCount++ << "\n"; //frame counter
-        game.PrintBlockPos();
+        game.PrintBlockData();
         // simulate a real game loop event
         userIn.handleInput(PressedKey);
         game.GetCheckdGrid();
